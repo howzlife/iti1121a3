@@ -17,6 +17,8 @@ public class LinkedStack<E> implements Stack<E> {
         private Elem<E> next;
 
         private Elem( E info, Elem<E> next) {
+            if (info == null) throw new IllegalStateException("Please enter valid values");
+
             this.info = info;
             this.next = next;
         }
@@ -50,6 +52,10 @@ public class LinkedStack<E> implements Stack<E> {
      */
 
     public E peek() {
+        if (top ==  null) {
+            throw new EmptyStackException("The stack is empty!");
+        }
+
         return top.info;
     }
 
@@ -59,7 +65,13 @@ public class LinkedStack<E> implements Stack<E> {
      */
 
     public E pop() {
-        E savedInfo = top.info;
+        E savedInfo;
+
+        if (top == null) {
+            throw new EmptyStackException("The stack is empty!");
+        }
+
+        savedInfo = top.info;
         top = top.next;
         return savedInfo;
     }
@@ -70,6 +82,9 @@ public class LinkedStack<E> implements Stack<E> {
      */
 
     public void push( E elem ) {
+        if (elem == null) {
+            throw new IllegalStateException("The element is null, cannot push to stack");
+        }
         top = new Elem<E>( elem, top );
     }
 
@@ -79,22 +94,24 @@ public class LinkedStack<E> implements Stack<E> {
      */
 
     public String toString() {
+        StringBuffer b;
 
-	StringBuffer b;
-	b = new StringBuffer( "LinkedStack: {" );
+        if (top == null) {
+            throw new EmptyStackException("The stack is empty!");
+        }
+        b = new StringBuffer( "LinkedStack: {" );
 
-	Elem<E> p;
-	p = top;
-	while ( p!=null ) {
-	    if ( p!=top ) {
-		b.append( "," );
-	    }
-	    b.append( p.info );
-	    p = p.next;
-	}
+        Elem<E> p;
+        p = top;
+        while ( p!=null ) {
+            if ( p!=top ) {
+                b.append( "," );
+            }
+            b.append( p.info );
+            p = p.next;
+        }
 
-	b.append( "}" );
-	return b.toString();
+        b.append( "}" );
+        return b.toString();
     }
-
 }

@@ -128,8 +128,15 @@ public class Viewer extends JFrame implements TableModelListener {
      */
 
     public void execute(Graphics g) {
+        output.setText("");
 	String program = s.getValueAt(selectedRow, selectedColumn).toString();
-	lvm.execute(program, g, output, s);
+        try {
+            lvm.execute(program, g, output, s);
+        } catch (LukaSyntaxException e) {
+            output.append("Syntax exception encountered on token "+
+                          e.getMessage()+" in cell ("+selectedRow+","+
+                          selectedColumn+")\n");
+        }
     }
 
     @Override

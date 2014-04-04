@@ -1,4 +1,7 @@
 import java.awt.*;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.NoSuchMethodException;
 
 import javax.swing.JTextArea;
 
@@ -49,6 +52,11 @@ public class Interpreter {
     private Color gsColor;
 
     /**
+     * Instance variable. The spreadsheet.
+     */
+    private Sheet sheet;
+
+    /**
      * Initializes this newly created interpreter so that the operand stack is
      * empty, the accumulator is set 0, the cursor is at (0,0), and the default
      * color is blue.
@@ -64,7 +72,7 @@ public class Interpreter {
 
     private void reset() {
 
-	operands = new LinkedStack<Token>();
+        execute_clear();
 
 	gsX = 0;
 	gsY = 0;
@@ -79,12 +87,19 @@ public class Interpreter {
      *            contains the source to be executed.
      * @param g
      *            the graphics context.
-     * @param output TODO
+     * @param output
+     *            the area for textual output.
+     * @param sheet
+     *            the spreadsheet.
      */
 
     public void execute(String program, Graphics g, JTextArea output, Sheet sheet) {
+        Token t;
+        String symbol;
 
 	reset();
+
+        this.sheet = sheet;
 
 	r = new Reader(program);
 
@@ -92,71 +107,66 @@ public class Interpreter {
 
 	while (r.hasMoreTokens()) {
 
-	    Token t = r.nextToken();
+	    t = r.nextToken();
 
 	    if (t.isNumber()) {
 
 		operands.push(t);
 
-	    } else if (t.getSymbol().equals("add")) {
-
-		execute_add();
-
-	    } else if (t.getSymbol().equals("sub")) {
-
-		execute_sub();
-
-	    } else if (t.getSymbol().equals("mul")) {
-
-		execute_mul();
-
-	    } else if (t.getSymbol().equals("div")) {
-
-		execute_div();
-
-	    } else if (t.getSymbol().equals("exch")) {
-
-		execute_exch();
-
-	    } else if (t.getSymbol().equals("pop")) {
-
-		execute_pop();
-
-	    } else if (t.getSymbol().equals("moveto")) {
-
-		execute_moveto();
-
-	    } else if (t.getSymbol().equals("lineto")) {
-
-		execute_lineto(g);
-
-	    } else if (t.getSymbol().equals("arc")) {
-
-		execute_arc(g);
-
 	    } else if (t.getSymbol().startsWith("/")) {
 
 		operands.push(new Token(t.getSymbol().substring(1)));
 
-	    } else if (t.getSymbol().equals("quit")) {
+	    } else {
+                symbol = t.getSymbol();
+                try {
+                    if (symbol.equals("pstack")) {
 
-		execute_quit();
+                        Interpreter.class
+                            .getDeclaredMethod("execute_" + t.getSymbol(),
+                                               JTextArea.class)
+                            .invoke(this, output);
 
-	    } else if (t.getSymbol().equals("mark")) {
+                    } else if (symbol.equals("lineto") || symbol.equals("arc")) {
 
-		execute_mark();
+                        Interpreter.class
+                            .getDeclaredMethod("execute_" + t.getSymbol(),
+                                               Graphics.class)
+                            .invoke(this, g);
+                    } else {
+                        Interpreter.class
+                            .getDeclaredMethod("execute_" + t.getSymbol())
+                            .invoke(this);
+                    }
+                } catch (NoSuchMethodException e) {
+                    throw new LukaSyntaxException(symbol);
+                } catch (InvocationTargetException e) {
+                    throw (RuntimeException)e.getCause();
+                } catch (IllegalAccessException e) {
+                    // This should never happen
+                    // It is a checked exception though
+                }
+            }
+        }
 
-	    } else if (t.getSymbol().equals("cleartomark")) {
+    }
 
-		execute_cleartomark();
+    private String[] getStackContents() {
+        String[] stackContents;
+        stackContents = operands.toString().split("\\{")[1].split("\\}");
+        if (stackContents.length > 0)
+            return stackContents[0].split(",");
+        return new String[0];
+    }
 
-	    } else if (t.getSymbol().equals("counttomark")) {
-
-		execute_counttomark();
-
-	    } 
-	}
-
+    private void pushCell(int col, int row) {
+        try {
+            operands.push(new Token(Integer.parseInt(sheet.getValueAt(row, col)
+                                                     .toString())));
+        } catch (NumberFormatException e) {
+            // I don't want arbitrary code!
+            // Fail silently like a good GUI program...
+        }
     }
 
     private void execute_add() {
@@ -259,4 +269,98 @@ public class Interpreter {
 	System.exit(0);
     }
 
+    private void execute_pstack(JTextArea output) {
+        String[] stackContents;
+        stackContents = getStackContents();
+        output.append("[");
+        for (int i=stackContents.length-1;i>-1;i--)
+            output.append(stackContents[i] + " ");
+        output.append("\n");
+    }
+
+    private void execute_clear() {
+	operands = new LinkedStack<Token>();
+    }
+
+    private void execute_dup() {
+        Token top;
+        top = operands.pop();
+        operands.push(top);
+        operands.push(top);
+    }
+
+    private void execute_count() {
+        operands.push(new Token(getStackContents().length));
+    }
+
+    private void execute_sumtomark() {
+        String[] stackContents;
+        int sum, length;
+
+        stackContents = getStackContents();
+        sum = 0;
+        length = stackContents.length;
+        for (int i=0;i<length;i++) {
+            try {
+                sum += Integer.parseInt(stackContents[i]);
+            } catch (NumberFormatException e) {
+                if (stackContents[i].equals("mark"))
+                    break;
+            }
+        }
+        operands.push(new Token(sum));
+    }
+
+    private void execute_roll() {
+        Stack<Token> tempStack;
+        Token top;
+        int rolls, length;
+
+        tempStack = new LinkedStack<Token>();
+        rolls = operands.pop().getNumber();
+        length = operands.pop().getNumber() - 1;
+        for (int i=0;i<rolls;i++) {
+            top = operands.pop();
+            for (int j=0;j<length;j++) {
+                tempStack.push(operands.pop());
+                if (operands.isEmpty())
+                    break;
+            }
+            operands.push(top);
+            while (!tempStack.isEmpty()) {
+                operands.push((Token)tempStack.pop());
+            }
+        }
+    }
+
+    private void execute_cell() {
+        Token t1, t2;
+        int col;
+
+        t1 = operands.pop();
+        t2 = operands.pop();
+        // ((char) A) == 65
+        col = ((int)t2.getSymbol().charAt(0)) - 65;
+        pushCell(col, t1.getNumber());
+
+    }
+
+    private void execute_pushrow() {
+        int row;
+
+        row = operands.pop().getNumber();
+        for (int col=0;col<Viewer.NUMBER_OF_COLUMN;col++) {
+            pushCell(col, row);
+        }
+    }
+
+    private void execute_pushcol() {
+        int col;
+
+        // ((char) A) == 65
+        col = ((int)operands.pop().getSymbol().charAt(0)) - 65;
+        for (int row=0;row<Viewer.NUMBER_OF_ROW;row++) {
+            pushCell(col, row);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 /** An implementation of the interface Stack using the dynamic
  *  array technique.
- * 
+ *
  * @author Marcel Turcotte
  */
 
@@ -11,11 +11,16 @@ public class DynamicArrayStack<E> implements Stack<E> {
 
     private E[] elems;
 
+    // Declare a constant default stack increment/decrement
+
+    private final int defaultInc = 25;
+
     /** An instance variable that keeps track of the position of
-     *  the next free cell. For an empty stack the value is 0.
+     *  the next free cell. For an empty stack the value is -1.
      */
 
-    private int top = 0;
+    private int top = -1;
+    private int inc;
 
     /** Creates an empty stack.
      */
@@ -23,7 +28,15 @@ public class DynamicArrayStack<E> implements Stack<E> {
     @SuppressWarnings( "unchecked" )
 
     public DynamicArrayStack( int increment ) {
-	elems = (E[]) new Object[ 25 ];
+        this.inc = increment;
+        elems = (E[]) new Object[inc];
+    }
+
+    @SuppressWarnings( "unchecked" )
+
+    public DynamicArrayStack(  ) {
+        inc = defaultInc;
+        elems = (E[]) new Object[inc];
     }
 
     /** Tests if this stack is empty.
@@ -32,7 +45,7 @@ public class DynamicArrayStack<E> implements Stack<E> {
      */
 
     public boolean isEmpty() {
-	return top == 0;
+        return top == -1;
     }
 
     /** Returns the top element of this stack without removing it.
@@ -41,7 +54,11 @@ public class DynamicArrayStack<E> implements Stack<E> {
      */
 
     public E peek() {
-	return elems[ top-1 ];
+        if (top != -1) {
+            return elems[top];
+        } else {
+            throw new EmptyStackException("Stack is Empty");
+        }
     }
 
     /** Returns and remove the top element of this stack.
@@ -49,12 +66,25 @@ public class DynamicArrayStack<E> implements Stack<E> {
      * @return the top element of the stack.
      */
 
+    @SuppressWarnings( "unchecked" )
+
     public E pop() {
-	// save the top element
-	E saved = elems[ --top ];
-	// scrub the memory, then decrements top
-	elems[ top ] = null; 
-	return saved;
+        E[] newelems;
+        E saved;
+
+        if (top == -1) {
+            throw new EmptyStackException("Stack is Empty");
+        }
+
+        saved = elems[top];
+        // scrub the memory, then decrements top
+        elems[top--] = null;
+        if (top + inc + 2 < elems.length) {
+            newelems = (E[]) new Object[elems.length - inc];
+            System.arraycopy(elems, 0, newelems, 0, top+1);
+            elems = newelems;
+        }
+        return saved;
     }
 
     /** Puts the element onto the top of this stack.
@@ -62,9 +92,22 @@ public class DynamicArrayStack<E> implements Stack<E> {
      * @param elem the element that will be pushed onto the top of the stack.
      */
 
+    @SuppressWarnings( "unchecked" )
+
     public void push( E elem ) {
-	// stores the element at position top, then increments top
-	elems[ top++ ] = elem;
+        E[] newelems;
+        // stores the element at position top, then increments top
+
+        if (elem == null) {
+            throw new IllegalStateException("Please pass a valid value");
+        } else {
+            if (++top == elems.length) {
+                newelems = (E[]) new Object[elems.length + inc];
+                System.arraycopy(elems, 0, newelems, 0, top+1);
+                elems = newelems;
+            }
+            elems[top] = elem;
+        }
     }
 
     /** Returns a string representation of this object.
@@ -73,20 +116,17 @@ public class DynamicArrayStack<E> implements Stack<E> {
      */
 
     public String toString() {
+        StringBuffer b;
 
-	StringBuffer b;
-	b = new StringBuffer( "DynamicArrayStack: {" );
+        b = new StringBuffer( "DynamicArrayStack: {" );
+        for ( int i=top; i>-1; i-- ) {
+            if ( i!=top-1 ) {
+                b.append( "," );
+            }
+            b.append( elems[i] );
+        }
 
-	for ( int i=top-1; i>=0; i-- ) {
-	    if ( i!=top-1 ) {
-		b.append( "," );
-	    }
-	    b.append( elems[ i ] );
-	}
-
-	b.append( "}" );
-
-	return b.toString();
+        b.append( "}" );
+        return b.toString();
     }
-
 }
